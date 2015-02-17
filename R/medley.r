@@ -20,6 +20,7 @@
 #' p <- predict(m, x[-train,]);
 #' rmse(p, y[-train]);
 create.medley <- function (x, y, label='', errfunc=rmse, base.model=NULL, folds=8) {
+  # If the base model is not null, predict on the x (features)
   if (!is.null(base.model)) {
     base.y <- predict(base.model, x);
   } else {
@@ -27,9 +28,9 @@ create.medley <- function (x, y, label='', errfunc=rmse, base.model=NULL, folds=
   }
   object <- list(
     x=as.matrix(x), 
-    y=y,
-    base.y=base.y,
-    mod.y=y - base.y, 
+    y=y,			# base y is the y modified by the base model
+    base.y=base.y,		# 
+    mod.y=y - base.y, 		# 
     errfunc=errfunc, 
     models=list(), 
     args=list(), 
@@ -53,15 +54,26 @@ create.medley <- function (x, y, label='', errfunc=rmse, base.model=NULL, folds=
 #' @param ... further medleys to combine
 #' @export
 combine.medley <- function (e1, e2=NULL, ...) {
+  
+  # If theres only one model, return it
   if (is.null(e2)) return(e1);
   
+  # e1 will be the defacto model holder
+  # here two models are concatenated
   e1$models <- c(e1$models, e2$models);
+  
   e1$args <- c(e1$args, e2$args);
+  
   e1$predict.args <- c(e1$predict.args, e2$predict.args);
+  
   e1$feature.subset <- c(e1$feature.subset, e2$feature.subset);
+  
   e1$fitted <- c(e1$fitted, e2$fitted);
+  
   e1$cv <- c(e1$cv, e2$cv);
+  
   e1$postprocess <- c(e1$postprocess, e2$postprocess);
+  
   return(combine.medley(e1, ...));
 }
 
@@ -76,18 +88,31 @@ combine.medley <- function (e1, e2=NULL, ...) {
 #' @param postprocess an optional function to apply to the predicted values
 #' @export
 add.medley <- function (object, model, args=list(), predict.args=list(), feature.subset=NULL, folds=object$folds, postprocess=c()) {
+  # If the subset of features to be used is NULL (ie not specified), make the feature subset all the features available (ie x)
   if (is.null(feature.subset)) {
     feature.subset <- c(1:ncol(object$x));
   }
+  
+  # n is the number of models currently plus one for the model being added
+  # our nth column will be the nth model!
   n <- length(object$models) + 1;
+  
+  # we'll added model to our column (NOTE: I'm not sure if its replacing here or just adding, I suspect the latter)
   object$models[[n]] <- model;
+  # Add the arguments to be passed to the model function here
   object$args[[n]] <- args;
+  # Add the arguments to be passed to the prediction function for that model here
   object$predict.args[[n]] <- predict.args;
+  # Add the feature subset to be predicted on here
   object$feature.subset[[n]] <- feature.subset;
+  # Add the optional function for post-processing here
   object$postprocess[[n]] <- function(x) x;
 
+  # this is the elapsed time
   pt <- proc.time()[[3]];
+  
   # Fit model to all data
+  # (Why are we fitting to the mod.y data?)
   data <- list(x=object$x[,feature.subset], y=object$mod.y);
   object$fitted[[n]] <- do.call(model, c(data, args));
   
